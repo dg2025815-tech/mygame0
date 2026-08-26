@@ -41,6 +41,8 @@
       display: block;
       width: 100%;
       height: 100%;
+      /* 터치 및 마우스 이벤트가 캔버스에 직접 전달되도록 설정 */
+      pointer-events: auto;
     }
 
     .ui-layer {
@@ -49,18 +51,18 @@
       left: 0;
       width: 100%;
       height: 100%;
-      pointer-events: none;
+      pointer-events: none; /* UI 레이어가 터치/클릭을 막지 않음 */
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       padding: 20px;
+      z-index: 10;
     }
 
     .scoreboard {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      z-index: 10;
     }
 
     .score-box {
@@ -93,22 +95,19 @@
       left: 50%;
       transform: translate(-50%, -50%);
       text-align: center;
-      pointer-events: auto;
       width: 85%;
-      background: rgba(0, 0, 0, 0.65);
+      background: rgba(0, 0, 0, 0.75);
       backdrop-filter: blur(10px);
       padding: 30px 20px;
       border-radius: 24px;
       border: 1px solid rgba(255, 255, 255, 0.15);
       box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-      transition: opacity 0.3s ease, transform 0.3s ease;
       z-index: 30;
+      pointer-events: auto; /* 메뉴 화면일 때만 클릭 허용 */
     }
 
     .hidden {
-      opacity: 0;
-      pointer-events: none !important;
-      transform: translate(-50%, -40%);
+      display: none !important; /* 완전 은폐로 화면 가림 및 이벤트 간섭 방지 */
     }
 
     h1 {
@@ -192,7 +191,7 @@
     <!-- Start Screen -->
     <div id="startScreen" class="message-screen">
       <h1>Flappy Bird</h1>
-      <p>화면을 터치/클릭하거나 스페이스바를 눌러<br>장애물을 피하세요!</p>
+      <p>화면 터치, 클릭, 또는 스페이스바를 눌러<br>장애물을 피하세요!</p>
       <button class="btn" id="startBtn">게임 시작</button>
     </div>
 
@@ -231,26 +230,28 @@
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    let gameState = 'START';
+    let gameState = 'START'; // START, PLAYING, GAMEOVER
     let score = 0;
     let highScore = localStorage.getItem('flappy_high_score') || 0;
     highScoreEl.textContent = highScore;
 
     let frames = 0;
-    let isNewRecord = false;
+    let animationFrameId = null;
 
+    // Bird Object
     const bird = {
       x: 60,
       y: 0,
       radius: 16,
-      gravity: 0.35,
-      jump: -6.5,
+      gravity: 0.38,
+      jump: -6.8,
       velocity: 0,
       draw() {
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(Math.min(Math.PI / 4, Math.max(-Math.PI / 4, this.velocity * 0.1)));
 
+        // 몸통
         ctx.beginPath();
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
         ctx.fillStyle = '#ffda79';
@@ -259,6 +260,7 @@
         ctx.strokeStyle = '#333';
         ctx.stroke();
 
+        // 눈
         ctx.beginPath();
         ctx.arc(6, -4, 5, 0, Math.PI * 2);
         ctx.fillStyle = '#fff';
@@ -268,6 +270,7 @@
         ctx.fillStyle = '#000';
         ctx.fill();
 
+        // 부리
         ctx.beginPath();
         ctx.arc(10, 4, 6, 0, Math.PI * 2);
         ctx.fillStyle = '#ff5252';
@@ -279,10 +282,12 @@
         this.velocity += this.gravity;
         this.y += this.velocity;
 
+        // 바닥 충돌
         if (this.y + this.radius >= canvas.height - 40) {
           this.y = canvas.height - 40 - this.radius;
           endGame();
         }
+        // 천장 제한
         if (this.y - this.radius <= 0) {
           this.y = this.radius;
           this.velocity = 0;
@@ -293,6 +298,7 @@
       }
     };
 
+    // Pipes
     const pipes = [];
     const pipeWidth = 60;
     const pipeGap = 160;
@@ -312,6 +318,7 @@
 
     function drawPipes() {
       pipes.forEach(pipe => {
+        // 위쪽 파이프
         ctx.fillStyle = '#2ed573';
         ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top);
         ctx.strokeStyle = '#1e8449';
@@ -321,6 +328,7 @@
         ctx.fillRect(pipe.x - 4, pipe.top - 20, pipeWidth + 8, 20);
         ctx.strokeRect(pipe.x - 4, pipe.top - 20, pipeWidth + 8, 20);
 
+        // 아래쪽 파이프
         const bottomY = canvas.height - pipe.bottom - 40;
         ctx.fillRect(pipe.x, bottomY, pipeWidth, pipe.bottom);
         ctx.strokeRect(pipe.x, bottomY, pipeWidth, pipe.bottom);
@@ -331,11 +339,12 @@
     }
 
     function updatePipes() {
-      if (frames % 100 === 0) createPipe();
+      if (frames % 90 === 0) createPipe();
 
       pipes.forEach((pipe, index) => {
         pipe.x -= 2.5;
 
+        // 충돌 판정
         const birdRight = bird.x + bird.radius;
         const birdLeft = bird.x - bird.radius;
         const birdTop = bird.y - bird.radius;
@@ -347,12 +356,14 @@
           }
         }
 
+        // 점수 획득
         if (pipe.x + pipeWidth < bird.x && !pipe.passed) {
           pipe.passed = true;
           score++;
           currentScoreEl.textContent = score;
         }
 
+        // 화면 벗어난 파이프 제거
         if (pipe.x + pipeWidth < 0) {
           pipes.splice(index, 1);
         }
@@ -366,6 +377,7 @@
       ctx.fillRect(0, canvas.height - 40, canvas.width, 8);
     }
 
+    // Fireworks
     let particles = [];
     function triggerFireworks() {
       particles = [];
@@ -411,39 +423,36 @@
       }
     }
 
-    // --- 주요 수정 부분: 조작 반응 방식 통합 ---
-    function handleFlap(e) {
-      // 스페이스바 누를 시 브라우저 스크롤 스킵 현상 방지
-      if (e.type === 'keydown') {
-        if (e.code === 'Space' || e.key === ' ') {
-          e.preventDefault();
-        } else {
-          return;
-        }
-      }
-
-      // 게임 플레이 중일 때만 점프 수행
+    // --- 점프 제어 핵심 로직 ---
+    function triggerJump() {
       if (gameState === 'PLAYING') {
         bird.flap();
       }
     }
 
-    // 키보드, 마우스 클릭, 터치 이벤트 등록
-    window.addEventListener('keydown', handleFlap);
-    gameContainer.addEventListener('mousedown', (e) => {
-      // 버튼 클릭 시 중복 점프 방지
-      if (e.target.tagName !== 'BUTTON') {
-        handleFlap(e);
+    // 키보드 스페이스바 전용 처리
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' || e.key === ' ') {
+        e.preventDefault(); // 웹 브라우저 스크롤 차단
+        triggerJump();
       }
     });
-    gameContainer.addEventListener('touchstart', (e) => {
-      if (e.target.tagName !== 'BUTTON') {
-        e.preventDefault(); // 모바일 더블터치 줌 및 터치 감지 개선
-        handleFlap(e);
-      }
-    }, { passive: false });
 
-    // 버튼 이벤트 바인딩
+    // 마우스 및 모바일 터치 처리
+    function handlePointer(e) {
+      // 버튼 눌렀을 때 클릭이 넘어오는 것 방지
+      if (e.target.tagName === 'BUTTON') return;
+      
+      if (gameState === 'PLAYING') {
+        if (e.type === 'touchstart') e.preventDefault(); // 모바일 줌/스크롤 방지
+        triggerJump();
+      }
+    }
+
+    gameContainer.addEventListener('mousedown', handlePointer);
+    gameContainer.addEventListener('touchstart', handlePointer, { passive: false });
+
+    // 시작 및 재시작 버튼 클릭 이벤트
     startBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       startGame();
@@ -455,6 +464,8 @@
     });
 
     function startGame() {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
       gameState = 'PLAYING';
       score = 0;
       frames = 0;
@@ -473,13 +484,12 @@
     function endGame() {
       gameState = 'GAMEOVER';
 
+      let isNewRecord = false;
       if (score > highScore) {
         highScore = score;
         localStorage.setItem('flappy_high_score', highScore);
         highScoreEl.textContent = highScore;
         isNewRecord = true;
-      } else {
-        isNewRecord = false;
       }
 
       if (isNewRecord) {
@@ -510,9 +520,10 @@
       bird.draw();
 
       frames++;
-      requestAnimationFrame(loop);
+      animationFrameId = requestAnimationFrame(loop);
     }
 
+    // 초기 화면 그리기
     bird.y = canvas.height / 2;
     drawEnvironment();
     bird.draw();
